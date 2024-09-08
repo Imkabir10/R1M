@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Chat Viewer</title>
+    <style>
+        /* General styling */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #000;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+        }
+
+        /* Chat container */
+        #chatContainer {
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            height: 500px;
+            overflow-y: scroll;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Chat bubbles for left-aligned messages (dark grey background) */
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 20px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+            font-size: 14px;
+            line-height: 1.4;
+            color: white;
+            background-color: #444; /* Static dark grey */
+        }
+
+        /* Right-aligned messages with dynamic gradient background */
+        .message.received {
+            background: linear-gradient(135deg, violet, blue); /* Default gradient for right-aligned */
+            transition: background 0.3s ease-in-out; /* Smooth transition effect */
+            align-self: flex-end;
+        }
+
+        /* Left-aligned messages */
+        .message.sent {
+            align-self: flex-start;
+        }
+
+        /* Date separator */
+        .date-separator {
+            text-align: center;
+            color: #f0f0f0;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+
+        /* Timestamp styling */
+        .meta {
+            font-size: 12px;
+            color: #ddd;
+            margin-top: 5px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Instagram Chat Viewer</h1>
+        <input type="file" id="fileInput" accept=".html">
+        <div id="chatContainer"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.name.endsWith('.html')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    parseInstagramHTML(content);
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please upload a valid .html file.');
+            }
+        });
+
+        function parseInstagramHTML(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = ''; // Clear existing messages
+
+            const messages = doc.querySelectorAll('div._a6-p');
+            const chatData = [];
+            const users = new Set();
+            const seenMessages = new Set();
+            let lastDisplayedDate = '';
+
+            messages.forEach(message => {
+                const messageText = message.textContent.trim();
+                const timestampElement = message.nextElementSibling;
+                const timeText = timestampElement ? timestampElement.textContent.trim() : '';
+
+                const user = message.previousElementSibling.textContent.trim();
+                const messageDate = timeText.split(',')[0];
+
+                users.add(user);
+
+                if (messageText && !seenMessages.has(messageText) && timeText) {
+                    seenMessages.add(messageText);
+                    chatData.push({
+                        text: messageText,
+                        originalTimestamp: new Date(timeText),
+                        timestamp: new Date(timeText),
+                        date: messageDate,
+                        user: user
+                    });
+                }
+            });
+
+            const [userLeft, userRight] = Array.from(users);
+
+            chatData.reverse();
+
+            chatData.forEach(data => {
+                if (data.date !== lastDisplayedDate) {
+                    const dateElement = document.createElement('div');
+                    dateElement.classList.add('date-separator');
+                    dateElement.textContent = data.date;
+                    chatContainer.appendChild(dateElement);
+                    lastDisplayedDate = data.date;
+                }
+
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+
+                if (data.user === userLeft) {
+                    messageElement.classList.add('sent'); // Left-aligned (dark grey)
+                } else if (data.user === userRight) {
+                    messageElement.classList.add('received'); // Right-aligned (dynamic gradient)
+                }
+
+                messageElement.textContent = data.text;
+
+                const meta = document.createElement('div');
+                meta.classList.add('meta');
+
+                const adjustedTimestamp = new Date(data.timestamp);
+                adjustedTimestamp.setHours(adjustedTimestamp.getHours() + 1);
+                adjustedTimestamp.setMinutes(adjustedTimestamp.getMinutes() + 30);
+
+                meta.textContent = formatAdjustedTimestamp(adjustedTimestamp);
+                messageElement.appendChild(meta);
+                chatContainer.appendChild(messageElement);
+            });
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            applyDynamicGradient(); // Apply dynamic color gradients after loading messages
+        }
+
+        function formatAdjustedTimestamp(timestamp) {
+            let hours = timestamp.getHours();
+            const minutes = timestamp.getMinutes();
+            let ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+
+            return `${hours}:${formattedMinutes} ${ampm}`;
+        }
+
+        function applyDynamicGradient() {
+            const chatContainer = document.getElementById('chatContainer');
+            const messages = document.querySelectorAll('.message.received'); // Only apply to right-aligned
+
+            chatContainer.addEventListener('scroll', function() {
+                const containerHeight = chatContainer.offsetHeight;
+                const scrollTop = chatContainer.scrollTop;
+
+                messages.forEach((message, index) => {
+                    const messageTop = message.offsetTop;
+                    const messageHeight = message.offsetHeight;
+                    const messagePosition = messageTop - scrollTop;
+
+                    const positionRatio = (messagePosition + messageHeight / 2) / containerHeight;
+
+                    const gradientValue = Math.max(0, Math.min(1, positionRatio));
+                    const blueToVioletRatio = 1 - gradientValue;
+
+                    message.style.background = `linear-gradient(135deg, rgba(238,130,238,${blueToVioletRatio}), rgba(0,0,255,${gradientValue}))`;
+                });
+            });
+        }
+    </script>
+</body>
+</html>

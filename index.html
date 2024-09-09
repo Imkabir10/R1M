@@ -87,126 +87,140 @@
 
     <script>
         document.getElementById('fileInput').addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file && file.name.endsWith('.html')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const content = e.target.result;
-                    parseInstagramHTML(content);
-                };
-                reader.readAsText(file);
-            } else {
-                alert('Please upload a valid .html file.');
-            }
-        });
+    const file = event.target.files[0];
+    if (file && file.name.endsWith('.html')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            parseInstagramHTML(content);
+        };
+        reader.readAsText(file);
+    } else {
+        alert('Please upload a valid .html file.');
+    }
+});
 
-        function parseInstagramHTML(html) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const chatContainer = document.getElementById('chatContainer');
-            chatContainer.innerHTML = ''; // Clear existing messages
+function parseInstagramHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const chatContainer = document.getElementById('chatContainer');
+    chatContainer.innerHTML = ''; // Clear existing messages
 
-            const messages = doc.querySelectorAll('div._a6-p');
-            const chatData = [];
-            const users = new Set();
-            const seenMessages = new Set();
-            let lastDisplayedDate = '';
+    const messages = doc.querySelectorAll('div._a6-p');
+    const chatData = [];
+    const users = new Set(); // To store distinct usernames
+    const seenMessages = new Set();
+    let lastDisplayedDate = '';
 
-            messages.forEach(message => {
-                const messageText = message.textContent.trim();
-                const timestampElement = message.nextElementSibling;
-                const timeText = timestampElement ? timestampElement.textContent.trim() : '';
+    // Extract messages and their details
+    messages.forEach(message => {
+        const messageText = message.textContent.trim();
+        const timestampElement = message.nextElementSibling; // Extract time from the next sibling
+        const timeText = timestampElement ? timestampElement.textContent.trim() : '';
 
-                const user = message.previousElementSibling.textContent.trim();
-                const messageDate = timeText.split(',')[0];
+        const user = message.previousElementSibling.textContent.trim(); // Get the username
+        const messageDate = timeText.split(',')[0]; // Extract the date part
 
-                users.add(user);
+        // Add the user to the Set of distinct users
+        users.add(user);
 
-                if (messageText && !seenMessages.has(messageText) && timeText) {
-                    seenMessages.add(messageText);
-                    chatData.push({
-                        text: messageText,
-                        originalTimestamp: new Date(timeText),
-                        timestamp: new Date(timeText),
-                        date: messageDate,
-                        user: user
-                    });
-                }
-            });
-
-            const [userLeft, userRight] = Array.from(users);
-
-            chatData.reverse();
-
-            chatData.forEach(data => {
-                if (data.date !== lastDisplayedDate) {
-                    const dateElement = document.createElement('div');
-                    dateElement.classList.add('date-separator');
-                    dateElement.textContent = data.date;
-                    chatContainer.appendChild(dateElement);
-                    lastDisplayedDate = data.date;
-                }
-
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('message');
-
-                if (data.user === userLeft) {
-                    messageElement.classList.add('sent'); // Left-aligned (dark grey)
-                } else if (data.user === userRight) {
-                    messageElement.classList.add('received'); // Right-aligned (dynamic gradient)
-                }
-
-                messageElement.textContent = data.text;
-
-                const meta = document.createElement('div');
-                meta.classList.add('meta');
-
-                const adjustedTimestamp = new Date(data.timestamp);
-                adjustedTimestamp.setHours(adjustedTimestamp.getHours() + 1);
-                adjustedTimestamp.setMinutes(adjustedTimestamp.getMinutes() + 30);
-
-                meta.textContent = formatAdjustedTimestamp(adjustedTimestamp);
-                messageElement.appendChild(meta);
-                chatContainer.appendChild(messageElement);
-            });
-
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            applyDynamicGradient(); // Apply dynamic color gradients after loading messages
-        }
-
-        function formatAdjustedTimestamp(timestamp) {
-            let hours = timestamp.getHours();
-            const minutes = timestamp.getMinutes();
-            let ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-
-            return `${hours}:${formattedMinutes} ${ampm}`;
-        }
-
-        function applyDynamicGradient() {
-            const chatContainer = document.getElementById('chatContainer');
-            const messages = document.querySelectorAll('.message.received'); // Only apply to right-aligned
-
-            chatContainer.addEventListener('scroll', function() {
-                const containerHeight = chatContainer.offsetHeight;
-                const scrollTop = chatContainer.scrollTop;
-
-                messages.forEach((message, index) => {
-                    const messageTop = message.offsetTop;
-                    const messageHeight = message.offsetHeight;
-                    const messagePosition = messageTop - scrollTop;
-
-                    const positionRatio = (messagePosition + messageHeight / 2) / containerHeight;
-
-                    const gradientValue = Math.max(0, Math.min(1, positionRatio));
-                    const blueToVioletRatio = 1 - gradientValue;
-
-                    message.style.background = `linear-gradient(135deg, rgba(238,130,238,${blueToVioletRatio}), rgba(0,0,255,${gradientValue}))`;
-                });
+        // Only add unique messages
+        if (messageText && !seenMessages.has(messageText) && timeText) {
+            seenMessages.add(messageText);
+            chatData.push({
+                text: messageText,
+                originalTimestamp: new Date(timeText),
+                timestamp: new Date(timeText),
+                date: messageDate,
+                user: user
             });
         }
+    });
+
+    // Detect distinct usernames
+    const [userLeft, userRight] = Array.from(users); // Left user, Right user
+
+    // Reverse the chatData for reverse order
+    chatData.reverse();
+
+    // Render messages
+    chatData.forEach(data => {
+        // Display date once per day
+        if (data.date !== lastDisplayedDate) {
+            const dateElement = document.createElement('div');
+            dateElement.classList.add('date-separator');
+            dateElement.textContent = data.date;
+            chatContainer.appendChild(dateElement);
+            lastDisplayedDate = data.date;
+        }
+
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+
+        // Align based on the detected usernames
+        if (data.user === userLeft) {
+            messageElement.classList.add('sent'); // Left user
+        } else if (data.user === userRight) {
+            messageElement.classList.add('received'); // Right user
+        }
+
+        messageElement.textContent = data.text;
+
+        const meta = document.createElement('div');
+        meta.classList.add('meta');
+
+        // Adjust timestamp (add 1 hour 30 minutes, swap AM/PM)
+        const adjustedTimestamp = new Date(data.timestamp);
+        adjustedTimestamp.setHours(adjustedTimestamp.getHours() + 1);
+        adjustedTimestamp.setMinutes(adjustedTimestamp.getMinutes() + 30);
+
+        meta.textContent = formatAdjustedTimestamp(adjustedTimestamp); // Add adjusted timestamp
+        messageElement.appendChild(meta);
+        chatContainer.appendChild(messageElement);
+    });
+
+    // Handle gradient change on visible bubbles as you scroll
+    chatContainer.addEventListener('scroll', handleScrollGradient);
+}
+
+// Function to handle dynamic gradient for each visible chat bubble
+function handleScrollGradient() {
+    const messages = document.querySelectorAll('.message');
+    messages.forEach((message) => {
+        const messageRect = message.getBoundingClientRect(); // Get bubble position
+        const containerRect = this.getBoundingClientRect();
+
+        // Check if the message is within the visible area of the chat container
+        if (messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom) {
+            const visibleFraction = (messageRect.top - containerRect.top) / containerRect.height;
+
+            // Calculate gradient based on its position
+            const startColor = `rgb(${Math.floor(50 + visibleFraction * 150)}, ${Math.floor(50 + visibleFraction * 100)}, 255)`; // Lighter start
+            const endColor = `rgb(${Math.floor(100 + visibleFraction * 50)}, 0, ${Math.floor(255 - visibleFraction * 100)})`; // Brighter end
+
+            // Apply dynamic gradient to each chat bubble
+            message.style.background = `linear-gradient(135deg, ${startColor}, ${endColor})`;
+        }
+    });
+}
+
+// Function to format and swap AM/PM
+function formatAdjustedTimestamp(timestamp) {
+    let hours = timestamp.getHours();
+    const minutes = timestamp.getMinutes();
+    const seconds = timestamp.getSeconds();
+
+    // Swap AM/PM logic
+    let ampm = hours >= 12 ? 'PM' : 'AM';
+    ampm = ampm === 'PM' ? 'AM' : 'PM'; // Swap AM to PM, PM to AM
+
+    // Adjust hours for display in 12-hour format
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
+
+    return `${formattedHours}:${formattedMinutes}:${formattedSeconds} ${ampm}`;
+}
     </script>
 </body>
 </html>

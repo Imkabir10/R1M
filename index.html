@@ -52,7 +52,7 @@
         /* Left-aligned messages (dark grey background) */
         .message.sent {
             align-self: flex-start;
-            background-color: #444; /* Dark grey background */
+            background-color: #444;
         }
 
         /* Right-aligned messages (dynamic gradient) */
@@ -81,23 +81,21 @@
 <body>
     <div class="container">
         <h1>Instagram Chat Viewer</h1>
-        <input type="file" id="fileInput" accept=".html">
         <div id="chatContainer"></div>
     </div>
 
     <script>
-        document.getElementById('fileInput').addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file && file.name.endsWith('.html')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const content = e.target.result;
-                    parseInstagramHTML(content);
-                };
-                reader.readAsText(file);
-            } else {
-                alert('Please upload a valid .html file.');
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch the .html file containing the chat messages
+            fetch('https://kabirim10.github.io/Message_1/')  // Replace with your actual file path or URL
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(data => parseInstagramHTML(data))
+                .catch(error => console.error('Error fetching the HTML file:', error));
         });
 
         function parseInstagramHTML(html) {
@@ -118,7 +116,7 @@
                 const timestampElement = message.nextElementSibling; // Extract time from the next sibling
                 const timeText = timestampElement ? timestampElement.textContent.trim() : '';
 
-                const user = message.previousElementSibling.textContent.trim(); // Get the username
+                const user = message.previousElementSibling ? message.previousElementSibling.textContent.trim() : 'User';
                 const messageDate = timeText.split(',')[0]; // Extract the date part
 
                 // Add the user to the Set of distinct users
@@ -137,15 +135,12 @@
                 }
             });
 
-            // Detect distinct usernames
-            const [userLeft, userRight] = Array.from(users); // Left user, Right user
+            const [userLeft, userRight] = Array.from(users);
 
-            // Reverse the chatData for reverse order
             chatData.reverse();
 
             // Render messages
             chatData.forEach(data => {
-                // Display date once per day
                 if (data.date !== lastDisplayedDate) {
                     const dateElement = document.createElement('div');
                     dateElement.classList.add('date-separator');
@@ -157,11 +152,10 @@
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message');
 
-                // Align based on the detected usernames
                 if (data.user === userLeft) {
-                    messageElement.classList.add('sent'); // Left user with dark grey background
+                    messageElement.classList.add('sent');
                 } else if (data.user === userRight) {
-                    messageElement.classList.add('received'); // Right user with dynamic gradient
+                    messageElement.classList.add('received');
                 }
 
                 messageElement.textContent = data.text;
@@ -169,51 +163,42 @@
                 const meta = document.createElement('div');
                 meta.classList.add('meta');
 
-                // Adjust timestamp (add 1 hour 30 minutes, swap AM/PM)
                 const adjustedTimestamp = new Date(data.timestamp);
                 adjustedTimestamp.setHours(adjustedTimestamp.getHours() + 1);
                 adjustedTimestamp.setMinutes(adjustedTimestamp.getMinutes() + 30);
 
-                meta.textContent = formatAdjustedTimestamp(adjustedTimestamp); // Add adjusted timestamp
+                meta.textContent = formatAdjustedTimestamp(adjustedTimestamp);
                 messageElement.appendChild(meta);
                 chatContainer.appendChild(messageElement);
             });
 
-            // Handle gradient change on visible bubbles as you scroll
             chatContainer.addEventListener('scroll', handleScrollGradient);
         }
 
-        // Function to handle dynamic gradient for each visible chat bubble on the right side (reversed colors)
         function handleScrollGradient() {
-            const messages = document.querySelectorAll('.message.received'); // Apply gradient only to the right-side bubbles
-            messages.forEach((message) => {
-                const messageRect = message.getBoundingClientRect(); // Get bubble position
+            const messages = document.querySelectorAll('.message.received');
+            messages.forEach(message => {
+                const messageRect = message.getBoundingClientRect();
                 const containerRect = this.getBoundingClientRect();
 
-                // Check if the message is within the visible area of the chat container
                 if (messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom) {
                     const visibleFraction = (messageRect.top - containerRect.top) / containerRect.height;
 
-                    // Reverse the color assignment, so blue is in the bottom and purple is in the top
-                    const startColor = `rgb(${Math.floor(100 + visibleFraction * 50)}, 0, ${Math.floor(255 - visibleFraction * 100)})`; // Brighter purple start
-                    const endColor = `rgb(${Math.floor(50 + visibleFraction * 150)}, ${Math.floor(50 + visibleFraction * 100)}, 255)`; // Lighter blue end
+                    const startColor = `rgb(${Math.floor(100 + visibleFraction * 50)}, 0, ${Math.floor(255 - visibleFraction * 100)})`;
+                    const endColor = `rgb(${Math.floor(50 + visibleFraction * 150)}, ${Math.floor(50 + visibleFraction * 100)}, 255)`;
 
-                    // Apply dynamic gradient to each chat bubble
                     message.style.background = `linear-gradient(135deg, ${endColor}, ${startColor})`;
                 }
             });
         }
 
-        // Function to format and swap AM/PM (without seconds)
         function formatAdjustedTimestamp(timestamp) {
             let hours = timestamp.getHours();
             const minutes = timestamp.getMinutes();
 
-            // Swap AM/PM logic
             let ampm = hours >= 12 ? 'PM' : 'AM';
-            ampm = ampm === 'PM' ? 'AM' : 'PM'; // Swap AM to PM, PM to AM
+            ampm = ampm === 'PM' ? 'AM' : 'PM';
 
-            // Adjust hours for display in 12-hour format
             const formattedHours = hours % 12 || 12;
             const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
 
